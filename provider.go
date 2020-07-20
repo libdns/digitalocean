@@ -1,4 +1,4 @@
-package transip
+package digitalocean
 
 import (
 	"context"
@@ -61,9 +61,11 @@ func (p *Provider) SetRecords(ctx context.Context, zone string, records []libdns
 	var setRecords []libdns.Record
 
 	for _, record := range records {
+		// TODO: if there is no ID, look up the Name, and fill it in, or call
+		//       newRecord, err := p.addDNSEntry(ctx, zone, record)
 		setRecord, err := p.updateDNSEntry(ctx, zone, record)
 		if err != nil {
-			return nil, err
+			return setRecords, err
 		}
 		setRecord.TTL = time.Duration(setRecord.TTL) * time.Second
 		setRecords = append(setRecords, setRecord)

@@ -1,4 +1,4 @@
-package transip
+package digitalocean
 
 import (
 	"context"
@@ -23,33 +23,49 @@ func (p *Provider) getClient() error {
 	return nil
 }
 
-func (p *Provider) getDNSEntries(ctx context.Context, domain string) ([]libdns.Record, error) {
+func (p *Provider) getDNSEntries(ctx context.Context, zone string) ([]libdns.Record, error) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
 	p.getClient()
 
-	domains, _, err := p.client.Domains.Records(ctx, domain, nil)
-	if err != nil {
-		return nil, err
-	}
-
+	opt := &godo.ListOptions{}
 	var records []libdns.Record
-	for _, entry := range domains {
-		record := libdns.Record{
-			Name:  entry.Name,
-			Value: entry.Data,
-			Type:  entry.Type,
-			TTL:   time.Duration(entry.TTL) * time.Second,
-			ID:    strconv.Itoa(entry.ID),
+	for {
+		domains, resp, err := p.client.Domains.Records(ctx, zone, opt)
+		if err != nil {
+			return records, err
 		}
-		records = append(records, record)
+
+		for _, entry := range domains {
+			record := libdns.Record{
+				Name:  entry.Name,
+				Value: entry.Data,
+				Type:  entry.Type,
+				TTL:   time.Duration(entry.TTL) * time.Second,
+				ID:    strconv.Itoa(entry.ID),
+			}
+			records = append(records, record)
+		}
+
+		// if we are at the last page, break out the for loop
+		if resp.Links == nil || resp.Links.IsLastPage() {
+			break
+		}
+
+		page, err := resp.Links.CurrentPage()
+		if err != nil {
+			return records, err
+		}
+
+		// set the page we want for the next request
+		opt.Page = page + 1
 	}
 
 	return records, nil
 }
 
-func (p *Provider) addDNSEntry(ctx context.Context, domain string, record libdns.Record) (libdns.Record, error) {
+func (p *Provider) addDNSEntry(ctx context.Context, zone string, record libdns.Record) (libdns.Record, error) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
@@ -62,7 +78,7 @@ func (p *Provider) addDNSEntry(ctx context.Context, domain string, record libdns
 		TTL:  int(record.TTL.Seconds()),
 	}
 
-	rec, _, err := p.client.Domains.CreateRecord(ctx, domain, &entry)
+	rec, _, err := p.client.Domains.CreateRecord(ctx, zone, &entry)
 	if err != nil {
 		return record, err
 	}
@@ -71,17 +87,18 @@ func (p *Provider) addDNSEntry(ctx context.Context, domain string, record libdns
 	return record, nil
 }
 
-func (p *Provider) removeDNSEntry(ctx context.Context, domain string, record libdns.Record) (libdns.Record, error) {
+func (p *Provider) removeDNSEntry(ctx context.Context, zone string, record libdns.Record) (libdns.Record, error) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
 	p.getClient()
 
 	id, err := strconv.Atoi(record.ID)
-	if err == nil {
+	if err != nil {
 		return record, err
 	}
-	_, err = p.client.Domains.DeleteRecord(ctx, domain, id)
+
+	_, err = p.client.Domains.DeleteRecord(ctx, zone, id)
 	if err != nil {
 		return record, err
 	}
@@ -89,14 +106,14 @@ func (p *Provider) removeDNSEntry(ctx context.Context, domain string, record lib
 	return record, nil
 }
 
-func (p *Provider) updateDNSEntry(ctx context.Context, domain string, record libdns.Record) (libdns.Record, error) {
+func (p *Provider) updateDNSEntry(ctx context.Context, zone string, record libdns.Record) (libdns.Record, error) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
 	p.getClient()
 
 	id, err := strconv.Atoi(record.ID)
-	if err == nil {
+	if err != nil {
 		return record, err
 	}
 
@@ -107,7 +124,7 @@ func (p *Provider) updateDNSEntry(ctx context.Context, domain string, record lib
 		TTL:  int(record.TTL.Seconds()),
 	}
 
-	_, _, err = p.client.Domains.EditRecord(ctx, domain, id, &entry)
+	_, _, err = p.client.Domains.EditRecord(ctx, zone, id, &entry)
 	if err != nil {
 		return record, err
 	}

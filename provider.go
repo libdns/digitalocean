@@ -10,6 +10,7 @@ import (
 // Provider implements the libdns interfaces for DigitalOcean
 type Provider struct {
 	Client
+	// APIToken is the DigitalOcean API token - see https://www.digitalocean.com/docs/apis-clis/api/create-personal-access-token/
 	APIToken string `json:"auth_token"`
 }
 

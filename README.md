@@ -1,5 +1,8 @@
 # DigitalOcean for `libdns`
 
+[![godoc reference](https://img.shields.io/badge/godoc-reference-blue.svg)](https://pkg.go.dev/github.com/libdns/digitalocean)
+
+
 This package implements the libdns interfaces for the [DigitalOcean API](https://developers.digitalocean.com/documentation/v2/#domains) (using the Go implementation from: https://github.com/digitalocean/godo)
 
 ## Authenticating
@@ -20,7 +23,7 @@ import (
 	"time"
 
 	"github.com/libdns/libdns"
-	"github.com/onaci/digitalocean"
+	"github.com/libdns/digitalocean"
 )
 
 func main() {

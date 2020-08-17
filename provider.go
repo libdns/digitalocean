@@ -15,7 +15,8 @@ type Provider struct {
 	APIToken string `json:"auth_token"`
 }
 
-func (p *Provider) getDomain(fqdn string) string {
+// unFQDN trims any trailing "." from fqdn. DigitalOcean's API does not use FQDNs.
+func (p *Provider) unFQDN(fqdn string) string {
 	return strings.TrimSuffix(fqdn, ".")
 }
 

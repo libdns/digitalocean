@@ -2,6 +2,7 @@ package digitalocean
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/libdns/libdns"
@@ -14,9 +15,14 @@ type Provider struct {
 	APIToken string `json:"auth_token"`
 }
 
+// unFQDN trims any trailing "." from fqdn. DigitalOcean's API does not use FQDNs.
+func (p *Provider) unFQDN(fqdn string) string {
+	return strings.TrimSuffix(fqdn, ".")
+}
+
 // GetRecords lists all the records in the zone.
 func (p *Provider) GetRecords(ctx context.Context, zone string) ([]libdns.Record, error) {
-	records, err := p.getDNSEntries(ctx, zone)
+	records, err := p.getDNSEntries(ctx, p.unFQDN(zone))
 	if err != nil {
 		return nil, err
 	}
@@ -29,7 +35,7 @@ func (p *Provider) AppendRecords(ctx context.Context, zone string, records []lib
 	var appendedRecords []libdns.Record
 
 	for _, record := range records {
-		newRecord, err := p.addDNSEntry(ctx, zone, record)
+		newRecord, err := p.addDNSEntry(ctx, p.unFQDN(zone), record)
 		if err != nil {
 			return nil, err
 		}
@@ -45,7 +51,7 @@ func (p *Provider) DeleteRecords(ctx context.Context, zone string, records []lib
 	var deletedRecords []libdns.Record
 
 	for _, record := range records {
-		deletedRecord, err := p.removeDNSEntry(ctx, zone, record)
+		deletedRecord, err := p.removeDNSEntry(ctx, p.unFQDN(zone), record)
 		if err != nil {
 			return nil, err
 		}
@@ -64,7 +70,7 @@ func (p *Provider) SetRecords(ctx context.Context, zone string, records []libdns
 	for _, record := range records {
 		// TODO: if there is no ID, look up the Name, and fill it in, or call
 		//       newRecord, err := p.addDNSEntry(ctx, zone, record)
-		setRecord, err := p.updateDNSEntry(ctx, zone, record)
+		setRecord, err := p.updateDNSEntry(ctx, p.unFQDN(zone), record)
 		if err != nil {
 			return setRecords, err
 		}

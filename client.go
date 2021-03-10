@@ -3,6 +3,7 @@ package digitalocean
 import (
 	"context"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -39,7 +40,7 @@ func (p *Provider) getDNSEntries(ctx context.Context, zone string) ([]libdns.Rec
 
 		for _, entry := range domains {
 			record := libdns.Record{
-				Name:  entry.Name,
+				Name:  entry.Name + "." + strings.Trim(zone, ".") + ".",
 				Value: entry.Data,
 				Type:  entry.Type,
 				TTL:   time.Duration(entry.TTL) * time.Second,
@@ -72,7 +73,7 @@ func (p *Provider) addDNSEntry(ctx context.Context, zone string, record libdns.R
 	p.getClient()
 
 	entry := godo.DomainRecordEditRequest{
-		Name: record.Name,
+		Name: strings.Trim(strings.ReplaceAll(record.Name, zone, ""), "."),
 		Data: record.Value,
 		Type: record.Type,
 		TTL:  int(record.TTL.Seconds()),
@@ -118,7 +119,7 @@ func (p *Provider) updateDNSEntry(ctx context.Context, zone string, record libdn
 	}
 
 	entry := godo.DomainRecordEditRequest{
-		Name: record.Name,
+		Name: strings.Trim(strings.ReplaceAll(record.Name, zone, ""), "."),
 		Data: record.Value,
 		Type: record.Type,
 		TTL:  int(record.TTL.Seconds()),

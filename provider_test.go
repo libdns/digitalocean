@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -56,9 +57,29 @@ func (m *mockDomainsService) RecordsByName(ctx context.Context, domain, name str
 	return nil, nil, nil
 }
 
-func (m *mockDomainsService) RecordsByTypeAndName(ctx context.Context, domain, ofType, name string, opt *godo.ListOptions) ([]godo.DomainRecord, *godo.Response, error) {
-	// Not used in our tests
-	return nil, nil, nil
+func (m *mockDomainsService) RecordsByTypeAndName(ctx context.Context, domain, ofType, name string, opts *godo.ListOptions) ([]godo.DomainRecord, *godo.Response, error) {
+	if m.err != nil {
+		return nil, &godo.Response{Response: &http.Response{StatusCode: 500}}, m.err
+	}
+
+	resp := &godo.Response{
+		Response: &http.Response{StatusCode: 200},
+		Links:    &godo.Links{},
+	}
+
+	// Simulate pagination by returning an empty list for any page > 1
+	if opts != nil && opts.Page > 1 {
+		return []godo.DomainRecord{}, resp, nil
+	}
+
+	records := []godo.DomainRecord{}
+	for _, r := range m.records {
+		if strings.Join([]string{r.Name, domain}, ".") == name && r.Type == ofType {
+			records = append(records, r)
+		}
+	}
+
+	return records, resp, nil
 }
 
 func (m *mockDomainsService) Records(ctx context.Context, domain string, opts *godo.ListOptions) ([]godo.DomainRecord, *godo.Response, error) {
@@ -281,6 +302,17 @@ func TestProvider_AppendRecords(t *testing.T) {
 }
 
 func TestProvider_DeleteRecords(t *testing.T) {
+	// Mock domain records to return
+	mockRecords := []godo.DomainRecord{
+		{
+			ID:   1,
+			Type: "A",
+			Name: "test",
+			Data: "192.168.1.1",
+			TTL:  3600,
+		},
+	}
+
 	// Test record to delete
 	testRecord := DNS{
 		ID: "1",
@@ -293,7 +325,7 @@ func TestProvider_DeleteRecords(t *testing.T) {
 	}
 
 	// Test successful call
-	p := setupTest(nil, nil)
+	p := setupTest(mockRecords, nil)
 	ctx := context.Background()
 
 	deletedRecords, err := p.DeleteRecords(ctx, "example.com.", []libdns.Record{testRecord})
@@ -309,6 +341,34 @@ func TestProvider_DeleteRecords(t *testing.T) {
 	// Verify the returned record
 	if deletedRecords[0].(DNS).ID != testRecord.ID {
 		t.Errorf("Provider.DeleteRecords() record ID mismatch, got = %v, want = %v", deletedRecords[0].(DNS).ID, testRecord.ID)
+	}
+
+	// Test no ID case
+	testRecordNoID := DNS{
+		Record: libdns.RR{
+			Type: "A",
+			Name: "test",
+			Data: "192.168.1.1",
+			TTL:  3600 * time.Second,
+		},
+	}
+
+	p = setupTest(mockRecords, nil)
+	ctx = context.Background()
+
+	deletedRecords, err = p.DeleteRecords(ctx, "example.com.", []libdns.Record{testRecordNoID})
+
+	if err != nil {
+		t.Errorf("Provider.DeleteRecords() error = %v", err)
+	}
+
+	if len(deletedRecords) != 1 {
+		t.Errorf("Provider.DeleteRecords() returned %d records, want 1", len(deletedRecords))
+	}
+
+	// Verify the returned record
+	if deletedRecords[0].RR().Name != testRecord.Record.Name {
+		t.Errorf("Provider.DeleteRecords() record Name mismatch, got = %v, want = %v", deletedRecords[0].RR().Name, testRecord.Record.Name)
 	}
 
 	// Test error case
@@ -338,6 +398,24 @@ func TestProvider_DeleteRecords(t *testing.T) {
 }
 
 func TestProvider_SetRecords(t *testing.T) {
+	// Mock domain records to return
+	mockRecords := []godo.DomainRecord{
+		{
+			ID:   1,
+			Type: "A",
+			Name: "test",
+			Data: "192.168.1.1",
+			TTL:  3600,
+		},
+		{
+			ID:   2,
+			Type: "A",
+			Name: "test",
+			Data: "192.168.1.1",
+			TTL:  3600,
+		},
+	}
+
 	// Test record to set
 	testRecord := DNS{
 		ID: "1",
@@ -350,7 +428,7 @@ func TestProvider_SetRecords(t *testing.T) {
 	}
 
 	// Test successful call
-	p := setupTest(nil, nil)
+	p := setupTest(mockRecords, nil)
 	ctx := context.Background()
 
 	setRecords, err := p.SetRecords(ctx, "example.com.", []libdns.Record{testRecord})
@@ -366,6 +444,33 @@ func TestProvider_SetRecords(t *testing.T) {
 	// Verify the returned record
 	if setRecords[0].(DNS).ID != testRecord.ID {
 		t.Errorf("Provider.SetRecords() record ID mismatch, got = %v, want = %v", setRecords[0].(DNS).ID, testRecord.ID)
+	}
+
+	// Test no ID case
+	testRecordNoID := DNS{
+		Record: libdns.RR{
+			Type: "A",
+			Name: "test",
+			Data: "192.168.1.1",
+			TTL:  3600 * time.Second,
+		},
+	}
+	p = setupTest(mockRecords, nil)
+	ctx = context.Background()
+
+	setRecords, err = p.SetRecords(ctx, "example.com.", []libdns.Record{testRecordNoID})
+
+	if err != nil {
+		t.Errorf("Provider.SetRecords() error = %v", err)
+	}
+
+	if len(setRecords) != 1 {
+		t.Errorf("Provider.SetRecords() returned %d records, want 1", len(setRecords))
+	}
+
+	// Verify the returned record
+	if setRecords[0].RR().Name != testRecord.Record.Name {
+		t.Errorf("Provider.SetRecords() record Name mismatch, got = %v, want = %v", setRecords[0].RR().Name, testRecord.Record.Name)
 	}
 
 	// Test error case

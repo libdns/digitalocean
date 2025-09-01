@@ -116,7 +116,11 @@ func TestClient_removeDNSEntry(t *testing.T) {
 	p := setupTest(nil, nil)
 	ctx := context.Background()
 
-	resultRecord, err := p.removeDNSEntry(ctx, "example.com", testRecord)
+	id, err := p.idFromRecord(ctx, "example.com", testRecord)
+	if err != nil {
+		t.Errorf("Client.idFromRecord() error = %v", err)
+	}
+	resultRecord, err := p.removeDNSEntry(ctx, "example.com", id, testRecord)
 
 	if err != nil {
 		t.Errorf("Client.removeDNSEntry() error = %v", err)
@@ -130,7 +134,11 @@ func TestClient_removeDNSEntry(t *testing.T) {
 	// Test error case - API error
 	p = setupTest(nil, errors.New("API error"))
 
-	_, err = p.removeDNSEntry(ctx, "example.com", testRecord)
+	id, err = p.idFromRecord(ctx, "example.com", testRecord)
+	if err != nil {
+		t.Errorf("Client.idFromRecord() error = %v", err)
+	}
+	_, err = p.removeDNSEntry(ctx, "example.com", id, testRecord)
 	if err == nil {
 		t.Error("Client.removeDNSEntry() expected error, got nil")
 	}
@@ -146,9 +154,9 @@ func TestClient_removeDNSEntry(t *testing.T) {
 		},
 	}
 
-	_, err = p.removeDNSEntry(ctx, "example.com", invalidIDRecord)
+	_, err = p.idFromRecord(ctx, "example.com", invalidIDRecord)
 	if err == nil {
-		t.Error("Client.removeDNSEntry() expected error for invalid ID, got nil")
+		t.Error("Client.idFromRecord() expected error, got nil")
 	}
 }
 
@@ -168,7 +176,11 @@ func TestClient_updateDNSEntry(t *testing.T) {
 	p := setupTest(nil, nil)
 	ctx := context.Background()
 
-	resultRecord, err := p.updateDNSEntry(ctx, "example.com", testRecord)
+	id, err := p.idFromRecord(ctx, "example.com", testRecord)
+	if err != nil {
+		t.Errorf("Client.idFromRecord() error = %v", err)
+	}
+	resultRecord, err := p.updateDNSEntry(ctx, "example.com", id, testRecord)
 
 	if err != nil {
 		t.Errorf("Client.updateDNSEntry() error = %v", err)
@@ -185,7 +197,11 @@ func TestClient_updateDNSEntry(t *testing.T) {
 	// Test error case - API error
 	p = setupTest(nil, errors.New("API error"))
 
-	_, err = p.updateDNSEntry(ctx, "example.com", testRecord)
+	id, err = p.idFromRecord(ctx, "example.com", testRecord)
+	if err != nil {
+		t.Errorf("Client.idFromRecord() error = %v", err)
+	}
+	_, err = p.updateDNSEntry(ctx, "example.com", id, testRecord)
 	if err == nil {
 		t.Error("Client.updateDNSEntry() expected error, got nil")
 	}
@@ -201,8 +217,8 @@ func TestClient_updateDNSEntry(t *testing.T) {
 		},
 	}
 
-	_, err = p.updateDNSEntry(ctx, "example.com", invalidIDRecord)
+	_, err = p.idFromRecord(ctx, "example.com", invalidIDRecord)
 	if err == nil {
-		t.Error("Client.updateDNSEntry() expected error for invalid ID, got nil")
+		t.Error("Client.idFromRecord() expected error, got nil")
 	}
 }

@@ -46,39 +46,37 @@ func main() {
 	if txtTestId != "" && aTestId != "" {
 		if deleteEntries {
 			fmt.Printf("Delete entry for %s (id:%s)\n", txtTestName, txtTestId)
-			_, err = provider.DeleteRecords(context.TODO(), zone, []libdns.Record{digitalocean.DNS{ID: txtTestId}})
+			_, err = provider.DeleteRecords(context.TODO(), zone, []libdns.Record{libdns.RR{Name: txtTestName, Type: "TXT"}})
 			if err != nil {
 				fmt.Printf("ERROR: %s\n", err.Error())
 			}
 			fmt.Printf("Delete entry for %s (id:%s)\n", aTestName, aTestId)
-			_, err = provider.DeleteRecords(context.TODO(), zone, []libdns.Record{digitalocean.DNS{ID: aTestId}})
+			_, err = provider.DeleteRecords(context.TODO(), zone, []libdns.Record{libdns.RR{Name: aTestName, Type: "A"}})
 			if err != nil {
 				fmt.Printf("ERROR: %s\n", err.Error())
 			}
 		} else {
 			fmt.Printf("Replacing entry for %s\n", txtTestName)
-			_, err = provider.SetRecords(context.TODO(), zone, []libdns.Record{digitalocean.DNS{
-				Record: libdns.RR{
+			_, err = provider.SetRecords(context.TODO(), zone, []libdns.Record{
+				libdns.RR{
 					Type: "TXT",
 					Name: txtTestName,
 					Data: fmt.Sprintf("Replacement test entry created by libdns %s", time.Now()),
 					TTL:  time.Duration(30) * time.Second,
 				},
-				ID: txtTestId,
-			}})
+			})
 			if err != nil {
 				fmt.Printf("ERROR: %s\n", err.Error())
 			}
 			fmt.Printf("Replacing entry for %s\n", aTestName)
-			_, err = provider.SetRecords(context.TODO(), zone, []libdns.Record{digitalocean.DNS{
-				Record: libdns.RR{
+			_, err = provider.SetRecords(context.TODO(), zone, []libdns.Record{
+				libdns.RR{
 					Type: "A",
 					Name: aTestName,
 					Data: "127.0.0.1",
 					TTL:  time.Duration(30) * time.Second,
 				},
-				ID: aTestId,
-			}})
+			})
 			if err != nil {
 				fmt.Printf("ERROR: %s\n", err.Error())
 			}

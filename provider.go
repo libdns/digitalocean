@@ -49,7 +49,11 @@ func (p *Provider) DeleteRecords(ctx context.Context, zone string, records []lib
 	var deletedRecords []libdns.Record
 
 	for _, record := range records {
-		deletedRecord, err := p.removeDNSEntry(ctx, p.unFQDN(zone), record)
+		id, err := p.idFromRecord(ctx, p.unFQDN(zone), record)
+		if err != nil {
+			return nil, err
+		}
+		deletedRecord, err := p.removeDNSEntry(ctx, p.unFQDN(zone), id, record)
 		if err != nil {
 			return nil, err
 		}
@@ -65,9 +69,11 @@ func (p *Provider) SetRecords(ctx context.Context, zone string, records []libdns
 	var setRecords []libdns.Record
 
 	for _, record := range records {
-		// TODO: if there is no ID, look up the Name, and fill it in, or call
-		//       newRecord, err := p.addDNSEntry(ctx, zone, record)
-		setRecord, err := p.updateDNSEntry(ctx, p.unFQDN(zone), record)
+		id, err := p.idFromRecord(ctx, p.unFQDN(zone), record)
+		if err != nil {
+			return setRecords, err
+		}
+		setRecord, err := p.updateDNSEntry(ctx, p.unFQDN(zone), id, record)
 		if err != nil {
 			return setRecords, err
 		}

@@ -19,6 +19,9 @@ type mockDomainsService struct {
 
 	// Error to return (when testing error paths)
 	err error
+
+	// IDs passed to DeleteRecord, so a test can check which record was removed
+	deletedIDs []int
 }
 
 func (m *mockDomainsService) List(ctx context.Context, opts *godo.ListOptions) ([]godo.Domain, *godo.Response, error) {
@@ -96,6 +99,7 @@ func (m *mockDomainsService) CreateRecord(ctx context.Context, domain string, cr
 }
 
 func (m *mockDomainsService) DeleteRecord(ctx context.Context, domain string, id int) (*godo.Response, error) {
+	m.deletedIDs = append(m.deletedIDs, id)
 	if m.err != nil {
 		return &godo.Response{Response: &http.Response{StatusCode: 500}}, m.err
 	}
@@ -334,6 +338,45 @@ func TestProvider_DeleteRecords(t *testing.T) {
 	_, err = p.DeleteRecords(ctx, "example.com.", []libdns.Record{invalidIDRecord})
 	if err == nil {
 		t.Error("Provider.DeleteRecords() expected error for invalid ID, got nil")
+	}
+}
+
+func TestProvider_DeleteRecords_withoutID(t *testing.T) {
+	// certmagic hands back a plain record when it cleans up an ACME challenge.
+	// The provider has to find that record in the zone rather than fail on the
+	// missing ID, which used to leave every _acme-challenge record behind.
+	zone := []godo.DomainRecord{
+		{ID: 7, Type: "TXT", Name: "_acme-challenge", Data: "other-token", TTL: 30},
+		{ID: 42, Type: "TXT", Name: "_acme-challenge", Data: "the-token", TTL: 30},
+	}
+	p := setupTest(zone, nil)
+	ctx := context.Background()
+
+	plain := libdns.TXT{Name: "_acme-challenge", Text: "the-token", TTL: 30 * time.Second}
+	deleted, err := p.DeleteRecords(ctx, "example.com.", []libdns.Record{plain})
+	if err != nil {
+		t.Fatalf("Provider.DeleteRecords() error = %v", err)
+	}
+	if len(deleted) != 1 {
+		t.Errorf("Provider.DeleteRecords() returned %d records, want 1", len(deleted))
+	}
+	mock := p.client.Domains.(*mockDomainsService)
+	if len(mock.deletedIDs) != 1 || mock.deletedIDs[0] != 42 {
+		t.Errorf("Provider.DeleteRecords() deleted IDs = %v, want [42]", mock.deletedIDs)
+	}
+
+	// Quoted TXT data still matches the unquoted record in the zone
+	p = setupTest(zone, nil)
+	quoted := libdns.TXT{Name: "_acme-challenge", Text: "\"the-token\""}
+	if _, err := p.DeleteRecords(ctx, "example.com.", []libdns.Record{quoted}); err != nil {
+		t.Errorf("Provider.DeleteRecords() with quoted data error = %v", err)
+	}
+
+	// A record that is not in the zone is an error, not a silent no-op
+	p = setupTest(zone, nil)
+	missing := libdns.TXT{Name: "_acme-challenge", Text: "unknown-token"}
+	if _, err := p.DeleteRecords(ctx, "example.com.", []libdns.Record{missing}); err == nil {
+		t.Error("Provider.DeleteRecords() expected error for a record missing from the zone, got nil")
 	}
 }
 

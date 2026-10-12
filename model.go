@@ -50,16 +50,3 @@ func recordToGoDo(record libdns.Record) godo.DomainRecordEditRequest {
 		TTL:  int(rr.TTL.Seconds()),
 	}
 }
-
-// idFromRecord get the ID from a libdns.Record
-func idFromRecord(record libdns.Record) (int, error) {
-	var raw string
-	if dns, ok := record.(DNS); ok {
-		raw = dns.ID
-	}
-	id, err := strconv.Atoi(raw)
-	if err != nil {
-		return 0, err
-	}
-	return id, nil
-}

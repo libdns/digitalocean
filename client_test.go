@@ -64,6 +64,78 @@ func TestClient_getDNSEntries(t *testing.T) {
 	}
 }
 
+func TestClient_getDNSEntries_ExtraFields(t *testing.T) {
+	// DigitalOcean returning  extra fields outside of .Data
+	mockRecords := []godo.DomainRecord{
+		{ID: 1, Type: "MX", Name: "@", Data: "mail.example.com", Priority: 10, TTL: 3600},
+		{ID: 2, Type: "SRV", Name: "_sip._tcp", Data: "sip.example.com", Priority: 10, Weight: 20, Port: 5060, TTL: 3600},
+		{ID: 3, Type: "CAA", Name: "@", Data: "letsencrypt.org", Flags: 0, Tag: "issue", TTL: 3600},
+		{ID: 4, Type: "CAA", Name: "@", Data: "mailto:security@example.com", Flags: 128, Tag: "iodef", TTL: 3600},
+		{ID: 5, Type: "TXT", Name: "txt", Data: "hello world", TTL: 3600},
+	}
+
+	p := setupTest(mockRecords, nil)
+	records, err := p.getDNSEntries(context.Background(), "example.com")
+	if err != nil {
+		t.Fatalf("getDNSEntries() error: %v", err)
+	}
+
+	wantData := []string{
+		"10 mail.example.com",
+		"10 20 5060 sip.example.com",
+		`0 issue "letsencrypt.org"`,
+		`128 iodef "mailto:example@example.com"`,
+		"hello world",
+	}
+	if len(records) != len(wantData) {
+		t.Fatalf("getDNSEntries() returned %d records instead of %d", len(records), len(wantData))
+	}
+	for i, want := range wantData {
+		if got := records[i].RR().Data; got != want {
+			t.Errorf("getDNSEntries()[%d].Data = %q instead of %q", i, got, want)
+		}
+	}
+
+	// Rebuilt data must round-trip into libdns-typed records
+	mx, err := records[0].RR().Parse()
+	if err != nil {
+		t.Fatalf("MX Parse() error: %v", err)
+	}
+	if got := mx.(libdns.MX); got.Preference != 10 || got.Target != "mail.example.com" {
+		t.Errorf("MX Parse() = %+v", got)
+	}
+
+	srv, err := records[1].RR().Parse()
+	if err != nil {
+		t.Fatalf("SRV Parse() error: %v", err)
+	}
+	if got := srv.(libdns.SRV); got.Service != "sip" || got.Transport != "tcp" ||
+		got.Priority != 10 || got.Weight != 20 || got.Port != 5060 || got.Target != "sip.example.com" {
+		t.Errorf("SRV Parse() = %+v", got)
+	}
+
+	caa, err := records[3].RR().Parse()
+	if err != nil {
+		t.Fatalf("CAA Parse() error: %v", err)
+	}
+	if got := caa.(libdns.CAA); got.Flags != 128 || got.Tag != "iodef" || got.Value != "mailto:example@example.com" {
+		t.Errorf("CAA Parse() = %+v", got)
+	}
+}
+
+func TestDataFromGodo_EmptyRecords(t *testing.T) {
+	// Records without data must NOT produce fields like '0 '
+	for _, entry := range []godo.DomainRecord{
+		{Type: "MX"},
+		{Type: "SRV"},
+		{Type: "CAA"},
+	} {
+		if got := dataFromGodo(entry); got != "" {
+			t.Errorf("dataFromGodo(empty %s) = %q instead of empty string", entry.Type, got)
+		}
+	}
+}
+
 func TestClient_addDNSEntry(t *testing.T) {
 	// Test record to add
 	testRecord := libdns.RR{

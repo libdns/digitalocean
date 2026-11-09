@@ -12,6 +12,20 @@ type Provider struct {
 	Client
 	// APIToken is the DigitalOcean API token - see https://www.digitalocean.com/docs/apis-clis/api/create-personal-access-token/
 	APIToken string `json:"auth_token"`
+
+	// APIBase optionally overrides the API endpoint. It exists for services
+	// that implement DigitalOcean's v2 Domains API at a different host, so
+	// that they can be used without a separate provider package.
+	//
+	// It must be the API root only. godo prefixes the "v2" version segment to
+	// each request path itself, so do not include it here. A trailing slash is
+	// added if absent, because godo resolves request paths relative to this
+	// URL and a missing slash would discard the final path segment.
+	//
+	//	"https://api.example.com/"
+	//
+	// Leave empty to use DigitalOcean.
+	APIBase string `json:"api_base,omitempty"`
 }
 
 // unFQDN trims any trailing "." from fqdn. DigitalOcean's API does not use FQDNs.

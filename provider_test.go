@@ -417,3 +417,58 @@ func TestProvider_getClient(t *testing.T) {
 		t.Error("Provider.client should be initialized after getClient()")
 	}
 }
+
+func TestProvider_getClient_APIBase(t *testing.T) {
+	tests := []struct {
+		name    string
+		apiBase string
+		want    string
+		wantErr bool
+	}{
+		{
+			name:    "empty APIBase keeps the DigitalOcean endpoint",
+			apiBase: "",
+			want:    "https://api.digitalocean.com/",
+		},
+		{
+			name:    "APIBase overrides the endpoint",
+			apiBase: "https://api.binarylane.com.au/",
+			want:    "https://api.binarylane.com.au/",
+		},
+		{
+			// godo resolves request paths ("v2/domains/...") relative to
+			// BaseURL, so without a trailing slash the final segment is lost.
+			name:    "missing trailing slash is added",
+			apiBase: "https://api.example.com/some/prefix",
+			want:    "https://api.example.com/some/prefix/",
+		},
+		{
+			name:    "unparseable APIBase returns an error",
+			apiBase: "https://api.example.com/\x7f",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := &Provider{APIToken: "test-token"}
+			p.APIBase = tt.apiBase
+
+			err := p.getClient()
+
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("Provider.getClient() expected an error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Provider.getClient() error = %v", err)
+			}
+
+			if got := p.client.BaseURL.String(); got != tt.want {
+				t.Errorf("BaseURL = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}

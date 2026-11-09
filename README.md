@@ -9,6 +9,28 @@ This package implements the libdns interfaces for the [DigitalOcean API](https:/
 
 To authenticate you need to supply a DigitalOcean API token.
 
+## Compatible APIs
+
+Some services implement DigitalOcean's v2 Domains API at their own hostname. Set
+`APIBase` (`api_base` in JSON) to point this package at one of them instead of
+adding a near-identical provider package:
+
+```go
+provider := digitalocean.Provider{
+	APIToken: token,
+	APIBase:  "https://api.binarylane.com.au/",
+}
+```
+
+Supply the API root only. `godo` prefixes the `v2` version segment to each
+request path itself, so including it here would produce `/v2/v2/...`. A trailing
+slash is added if absent, since request paths are resolved relative to this URL.
+Leave `APIBase` empty to use DigitalOcean.
+
+Such services are not tested in CI and their compatibility is not verified by
+this package: if one diverges from DigitalOcean's API, calls against it will
+fail at runtime.
+
 ## Example
 
 Here's a minimal example of how to get all your DNS records using this `libdns` provider (see `_example/main.go`)

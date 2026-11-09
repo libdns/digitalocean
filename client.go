@@ -3,6 +3,7 @@ package digitalocean
 import (
 	"context"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/digitalocean/godo"
@@ -16,7 +17,20 @@ type Client struct {
 
 func (p *Provider) getClient() error {
 	if p.client == nil {
-		p.client = godo.NewFromToken(p.APIToken)
+		client := godo.NewFromToken(p.APIToken)
+
+		if p.APIBase != "" {
+			base := p.APIBase
+			if !strings.HasSuffix(base, "/") {
+				base += "/"
+			}
+
+			if err := godo.SetBaseURL(base)(client); err != nil {
+				return err
+			}
+		}
+
+		p.client = client
 	}
 
 	return nil
@@ -26,7 +40,9 @@ func (p *Provider) getDNSEntries(ctx context.Context, zone string) ([]libdns.Rec
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
-	p.getClient()
+	if err := p.getClient(); err != nil {
+		return nil, err
+	}
 
 	opt := &godo.ListOptions{}
 	var records []libdns.Record
@@ -62,7 +78,9 @@ func (p *Provider) addDNSEntry(ctx context.Context, zone string, record libdns.R
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
-	p.getClient()
+	if err := p.getClient(); err != nil {
+		return record, err
+	}
 
 	entry := recordToGoDo(record)
 
@@ -78,7 +96,9 @@ func (p *Provider) removeDNSEntry(ctx context.Context, zone string, record libdn
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
-	p.getClient()
+	if err := p.getClient(); err != nil {
+		return record, err
+	}
 
 	// Get ID from dns record
 	id, err := idFromRecord(record)
@@ -98,7 +118,9 @@ func (p *Provider) updateDNSEntry(ctx context.Context, zone string, record libdn
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
-	p.getClient()
+	if err := p.getClient(); err != nil {
+		return record, err
+	}
 
 	// Get ID from dns record
 	id, err := idFromRecord(record)
